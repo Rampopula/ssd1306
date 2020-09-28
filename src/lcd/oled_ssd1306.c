@@ -27,7 +27,6 @@
 #include "ssd1306_commands.h"
 #include "intf/ssd1306_interface.h"
 #include "intf/i2c/ssd1306_i2c.h"
-#include "intf/spi/ssd1306_spi.h"
 #include "ssd1306_hal/io.h"
 #ifdef SDL_EMULATION
 #include "sdl_core.h"
@@ -86,26 +85,16 @@ static const uint8_t PROGMEM s_oled128x32_initData[] =
 static void ssd1306_setBlock(lcduint_t x, lcduint_t y, lcduint_t w)
 {
     ssd1306_intf.start();
-    if (ssd1306_intf.spi)
-        ssd1306_spiDataMode(0);
-    else
-        ssd1306_intf.send(0x00);
+    ssd1306_intf.send(0x00);
     ssd1306_intf.send(SSD1306_COLUMNADDR);
     ssd1306_intf.send(x);
     ssd1306_intf.send(w ? (x + w - 1) : (ssd1306_lcd.width - 1));
     ssd1306_intf.send(SSD1306_PAGEADDR);
     ssd1306_intf.send(y);
     ssd1306_intf.send((ssd1306_lcd.height >> 3) - 1); 
-    if (ssd1306_intf.spi)
-    {
-        ssd1306_spiDataMode(1);
-    }
-    else
-    {
-        ssd1306_intf.stop();
-        ssd1306_intf.start();
-        ssd1306_intf.send(0x40);
-    }
+    ssd1306_intf.stop();
+    ssd1306_intf.start();
+    ssd1306_intf.send(0x40);
 }
 
 static void ssd1306_nextPage(void)
@@ -205,20 +194,6 @@ void    ssd1306_128x64_i2c_initEx(int8_t scl, int8_t sda, int8_t sa)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  SPI SSD1306 128x64
-///////////////////////////////////////////////////////////////////////////////
-
-void   ssd1306_128x64_spi_init(int8_t rstPin, int8_t cesPin, int8_t dcPin)
-{
-    if (rstPin >=0)
-    {
-        ssd1306_resetController( rstPin, 10 );
-    }
-    ssd1306_spiInit(cesPin, dcPin);
-    ssd1306_128x64_init();
-}
-
-///////////////////////////////////////////////////////////////////////////////
 //  I2C SSD1306 128x32
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -244,16 +219,3 @@ void    ssd1306_128x32_i2c_init()
     ssd1306_128x32_init();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//  SPI SSD1306 128x32
-///////////////////////////////////////////////////////////////////////////////
-
-void   ssd1306_128x32_spi_init(int8_t rstPin, int8_t cesPin, int8_t dcPin)
-{
-    if (rstPin >=0)
-    {
-        ssd1306_resetController( rstPin, 10 );
-    }
-    ssd1306_spiInit(cesPin, dcPin);
-    ssd1306_128x32_init();
-}

@@ -52,10 +52,6 @@ extern "C" {
 typedef struct
 {
     /**
-     * Indicates if spi or i2c interface is used.
-     */
-    uint8_t spi;
-    /**
      * Starts communication with SSD1306 display.
      */
     void (*start)(void);

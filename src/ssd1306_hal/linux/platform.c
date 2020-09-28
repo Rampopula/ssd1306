@@ -27,8 +27,6 @@
 #include "ssd1306_hal/io.h"
 #include "intf/ssd1306_interface.h"
 #include "intf/i2c/ssd1306_i2c.h"
-#include "intf/spi/ssd1306_spi_conf.h"
-#include "intf/spi/ssd1306_spi.h"
 
 #ifndef __KERNEL__
 
@@ -43,10 +41,7 @@
 #include <linux/i2c-dev.h>
 #include <linux/spi/spidev.h>
 
-#if defined(CONFIG_PLATFORM_SPI_AVAILABLE) && defined(CONFIG_PLATFORM_SPI_ENABLE) \
-    && !defined(SDL_EMULATION)
-#define LINUX_SPI_AVAILABLE
-#endif
+
 
 #define MAX_GPIO_COUNT   256
 
@@ -60,9 +55,6 @@
 #endif
 #define OUT 1
 
-#ifdef LINUX_SPI_AVAILABLE
-static void platform_spi_send_cache();
-#endif
 
 int gpio_export(int pin)
 {
@@ -228,13 +220,6 @@ void pinMode(int pin, int mode)
 
 void digitalWrite(int pin, int level)
 {
-#ifdef LINUX_SPI_AVAILABLE
-    if (s_ssd1306_dc == pin)
-    {
-        platform_spi_send_cache();
-    }
-#endif
-
     if (!s_exported_pin[pin])
     {
         if ( gpio_export(pin)<0 )
@@ -360,211 +345,8 @@ void ssd1306_platform_i2cInit(int8_t busId, uint8_t sa, ssd1306_platform_i2cConf
     ssd1306_intf.close = platform_i2c_close;
 }
 
-#else /* SDL_EMULATION */
-
-#include "sdl_core.h"
-
-static void platform_i2c_send_buffer(const uint8_t *buffer, uint16_t size)
-{
-    while (size--)
-    {
-        sdl_send_byte(*buffer);
-        buffer++;
-    };
-}
-
-void ssd1306_platform_i2cInit(int8_t busId, uint8_t sa, ssd1306_platform_i2cConfig_t * cfg)
-{
-    sdl_core_init();
-    ssd1306_intf.spi = 0;
-    ssd1306_intf.start = sdl_send_init;
-    ssd1306_intf.stop = sdl_send_stop;
-    ssd1306_intf.send = sdl_send_byte;
-    ssd1306_intf.send_buffer = platform_i2c_send_buffer;
-    ssd1306_intf.close = sdl_core_close;
-}
-
-#endif /* SDL_EMULATION */
-
 #endif // CONFIG_PLATFORM_I2C_AVAILABLE
 
-
-//////////////////////////////////////////////////////////////////////////////////
-//                        LINUX SPI IMPLEMENTATION
-//////////////////////////////////////////////////////////////////////////////////
-#if defined(CONFIG_PLATFORM_SPI_AVAILABLE) && defined(CONFIG_PLATFORM_SPI_ENABLE)
-
-#if !defined(SDL_EMULATION)
-
-static int     s_spi_fd = -1;
-extern uint32_t s_ssd1306_spi_clock;
-static uint8_t s_spi_cache[1024];
-static int s_spi_cached_count = 0;
-
-static void platform_spi_start(void)
-{
-    s_spi_cached_count = 0;
-}
-
-static void platform_spi_stop(void)
-{
-    platform_spi_send_cache();
-}
-
-static void platform_spi_send_cache()
-{
-    /* TODO: Yeah, sending single bytes is too slow, but *
-     * need to figure out how to detect data/command bytes *
-     * to send bytes as one block */
-    if ( s_spi_cached_count == 0 )
-    {
-        return;
-    }
-    struct spi_ioc_transfer mesg;
-    memset(&mesg, 0, sizeof mesg);
-    mesg.tx_buf = (unsigned long)&s_spi_cache[0];
-    mesg.rx_buf = 0;
-    mesg.len = s_spi_cached_count;
-    mesg.delay_usecs = 0;
-    mesg.speed_hz = 0;
-    mesg.bits_per_word = 8;
-    mesg.cs_change = 0;
-    if (ioctl(s_spi_fd, SPI_IOC_MESSAGE(1), &mesg) < 1)
-    {
-        fprintf(stderr, "SPI failed to send SPI message: %s\n", strerror (errno)) ;
-    }
-    s_spi_cached_count = 0;
-}
-
-static void platform_spi_send(uint8_t data)
-{
-    s_spi_cache[s_spi_cached_count] = data;
-    s_spi_cached_count++;
-    if ( s_spi_cached_count >= sizeof( s_spi_cache ) )
-    {
-        platform_spi_send_cache();
-    }
-}
-
-static void platform_spi_close(void)
-{
-    if (s_spi_fd >= 0)
-    {
-        close(s_spi_fd);
-        s_spi_fd = -1;
-    }
-}
-
-static void platform_spi_send_buffer(const uint8_t *data, uint16_t len)
-{
-    while (len--)
-    {
-        platform_spi_send(*data);
-        data++;
-    }
-}
-
-static void empty_function_spi(void)
-{
-}
-
-static void empty_function_arg_spi(uint8_t byte)
-{
-}
-
-static void empty_function_args_spi(const uint8_t *buffer, uint16_t bytes)
-{
-}
-
-void ssd1306_platform_spiInit(int8_t busId,
-                              int8_t ces,
-                              int8_t dcPin)
-{
-    char filename[20];
-    if (busId < 0)
-    {
-        busId = 0;
-    }
-    if (ces < 0)
-    {
-        ces = 0;
-    }
-    s_ssd1306_cs = -1;    // SPI interface does't need separate ces pin
-    s_ssd1306_dc = dcPin;
-    ssd1306_intf.spi = 1;
-    ssd1306_intf.start = empty_function_spi;
-    ssd1306_intf.stop = empty_function_spi;
-    ssd1306_intf.send = empty_function_arg_spi;
-    ssd1306_intf.send_buffer = empty_function_args_spi;
-    ssd1306_intf.close = empty_function;
-
-    snprintf(filename, 19, "/dev/spidev%d.%d", busId, ces);
-    if ((s_spi_fd = open(filename, O_RDWR)) < 0)
-    {
-        printf("Failed to initialize SPI: %s%s!\n",
-               strerror(errno), getuid() == 0 ? "": ", need to be root");
-        return;
-    }
-    unsigned int speed = s_ssd1306_spi_clock;
-    if (ioctl(s_spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed) < 0)
-    {
-        printf("Failed to set speed on SPI line: %s!\n", strerror(errno));
-    }
-    uint8_t mode = SPI_MODE_0;
-    if (ioctl (s_spi_fd, SPI_IOC_WR_MODE, &mode) < 0)
-    {
-        printf("Failed to set SPI mode: %s!\n", strerror(errno));
-    }
-    uint8_t spi_bpw = 8;
-    if (ioctl (s_spi_fd, SPI_IOC_WR_BITS_PER_WORD, &spi_bpw) < 0)
-    {
-        printf("Failed to set SPI BPW: %s!\n", strerror(errno));
-    }
-
-    ssd1306_intf.spi = 1;
-    ssd1306_intf.start = platform_spi_start;
-    ssd1306_intf.stop = platform_spi_stop;
-    ssd1306_intf.send = platform_spi_send;
-    ssd1306_intf.send_buffer = platform_spi_send_buffer;
-    ssd1306_intf.close = platform_spi_close;
-}
-
-#else /* SDL_EMULATION */
-
-#include "sdl_core.h"
-
-static void sdl_send_bytes(const uint8_t *buffer, uint16_t size)
-{
-    while (size--)
-    {
-        sdl_send_byte(*buffer);
-        buffer++;
-    };
-}
-
-void ssd1306_platform_spiInit(int8_t busId, int8_t ces, int8_t dcPin)
-{
-    sdl_core_init();
-    if (ces >= 0)
-    {
-        s_ssd1306_cs = ces;
-    }
-    if (dcPin >= 0)
-    {
-        s_ssd1306_dc = dcPin;
-    }
-    sdl_set_dc_pin(dcPin);
-    ssd1306_intf.spi = 1;
-    ssd1306_intf.start = sdl_send_init;
-    ssd1306_intf.stop = sdl_send_stop;
-    ssd1306_intf.send = sdl_send_byte;
-    ssd1306_intf.send_buffer = sdl_send_bytes;
-    ssd1306_intf.close = sdl_core_close;
-}
-
-#endif /* SDL_EMULATION */
-
-#endif // CONFIG_PLATFORM_SPI_AVAILABLE
 
 #else  // end of !KERNEL, KERNEL is below
 

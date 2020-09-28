@@ -24,7 +24,7 @@
 
 #include "lcd/lcd_common.h"
 #include "intf/ssd1306_interface.h"
-#include "intf/spi/ssd1306_spi.h"
+
 #include <stddef.h>
 
 #define CMD_ARG 0xFF
@@ -46,84 +46,6 @@ void ssd1306_configureI2cDisplay(const uint8_t *config, uint8_t configSize)
     {
         uint8_t data = pgm_read_byte(&config[i]);
         ssd1306_intf.send(data);
-    }
-    ssd1306_intf.stop();
-}
-
-void ssd1306_configureSpiDisplay(const uint8_t *config, uint8_t configSize)
-{
-    ssd1306_intf.start();
-    ssd1306_spiDataMode(0);
-    for( uint8_t i=0; i<configSize; i++)
-    {
-        uint8_t data = pgm_read_byte(&config[i]);
-        if (data == CMD_ARG)
-        {
-            data = pgm_read_byte(&config[++i]);
-            ssd1306_spiDataMode(1);
-            ssd1306_intf.send(data);
-            ssd1306_spiDataMode(0);
-        }
-        else
-        {
-            ssd1306_intf.send(data);
-        }
-    }
-    ssd1306_intf.stop();
-}
-
-void ssd1306_configureSpiDisplay2(const uint8_t *config, uint8_t configSize)
-{
-    uint8_t command = 1;
-    int8_t args;
-    ssd1306_intf.start();
-    ssd1306_spiDataMode(0);
-    for( uint8_t i=0; i<configSize; i++)
-    {
-        uint8_t data = pgm_read_byte(&config[i]);
-        if ( command )
-        {
-            if ( command == CMD_DELAY )
-            {
-                command = 1;
-                delay( data == 0xFF ? 500: data );
-            }
-            else
-            {
-                ssd1306_intf.send(data);
-                command = 0;
-                args = -1;
-            }
-        }
-        else
-        {
-            if (args < 0)
-            {
-                if ( data >= 128 )
-                {
-                    command = data;
-                }
-                else if ( data > 0 )
-                {
-                    args = data;
-                    ssd1306_spiDataMode(1);
-                }
-                else
-                {
-                    command = 1;
-                }
-            }
-            else
-            {
-                args--;
-                ssd1306_intf.send(data);
-                if ( !args )
-                {
-                    command = 1;
-                    ssd1306_spiDataMode(0);
-                }
-            }
-        }
     }
     ssd1306_intf.stop();
 }
