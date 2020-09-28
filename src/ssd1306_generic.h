@@ -166,7 +166,7 @@ lcduint_t ssd1306_getTextSize(const char *text, lcduint_t *height);
 ///////////////////////////////////////////////////////////////////////
 //                 HIGH-LEVEL GRAPH FUNCTIONS
 ///////////////////////////////////////////////////////////////////////
-
+#if 0
 /**
  * Describes menu object
  */
@@ -294,18 +294,20 @@ void ssd1306_menuDown(SAppMenu *menu);
  * @param menu - Pointer to SAppMenu structure
  */
 void ssd1306_menuUp(SAppMenu *menu);
-
+#endif
 /**
  * Draws progress bar in the middle of the screen
  * @param progress progress value in range 0 - 100.
  */
 void ssd1306_drawProgressBar(int8_t progress);
 
+#if 0
 /**
  * Draws progress bar in the middle of the screen
  * @param progress progress value in range 0 - 100.
  */
 void ssd1306_drawProgressBar8(int8_t progress);
+#endif
 
 /**
  * @}

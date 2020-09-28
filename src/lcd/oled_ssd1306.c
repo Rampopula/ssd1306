@@ -95,7 +95,7 @@ static void ssd1306_setBlock(lcduint_t x, lcduint_t y, lcduint_t w)
     ssd1306_intf.send(w ? (x + w - 1) : (ssd1306_lcd.width - 1));
     ssd1306_intf.send(SSD1306_PAGEADDR);
     ssd1306_intf.send(y);
-    ssd1306_intf.send((ssd1306_lcd.height >> 3) - 1);
+    ssd1306_intf.send((ssd1306_lcd.height >> 3) - 1); 
     if (ssd1306_intf.spi)
     {
         ssd1306_spiDataMode(1);

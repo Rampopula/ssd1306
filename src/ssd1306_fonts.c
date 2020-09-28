@@ -141,6 +141,7 @@ const PROGMEM uint8_t ssd1306xled_font6x8 []=
   0x00 /* This byte is required for italic type of font */
 };
 
+#if 0
 const PROGMEM uint8_t ssd1306xled_font8x16[] = {
     0x00, // 0x00 means fixed font type - the only supported by the library
     0x08, // 0x08 = 8 - font width in pixels
@@ -1353,3 +1354,4 @@ const uint8_t free_calibri11x12_latin[] PROGMEM =
     0x00, 0x00, 0x00, // end of unicode tables
     // FONT REQUIRES 1219 BYTES
 };
+#endif
